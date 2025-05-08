@@ -1,10 +1,13 @@
-import unittest
+import pytest
 from gridflow.downloader import QueryHandler
 
-class TestDownloader(unittest.TestCase):
-    def test_query_handler_init(self):
-        qh = QueryHandler()
-        self.assertEqual(len(qh.nodes), 4)
-
-if __name__ == '__main__':
-    unittest.main()
+def test_build_query():
+    query_handler = QueryHandler()
+    base_url = "https://esgf-node.llnl.gov/esg-search/search"
+    params = {"project": "CMIP6", "variable": "tas"}
+    query = query_handler.build_query(base_url, params)
+    expected = (
+        f"{base_url}?type=File&format=application%2Fsolr%2Bjson&limit=1000&distrib=true"
+        "&project=CMIP6&variable=tas"
+    )
+    assert query == expected
