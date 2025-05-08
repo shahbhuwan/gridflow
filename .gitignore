@@ -1,0 +1,14 @@
+venv/
+gridflow-env/
+__pycache__/
+*.pyc
+logs/
+*.log
+cmip6_data/
+cmip6_data_cropped/
+cmip6_data_clipped/
+metadata/
+*.tmp
+dist/
+build/
+*.egg-info/

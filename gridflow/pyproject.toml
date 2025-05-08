@@ -1,0 +1,29 @@
+[project]
+name = "gridflow"
+version = "0.2.3"
+description = "A library to download, crop, and clip CMIP6 data from ESGF nodes with deduplication and error handling"
+readme = "README.md"
+authors = [
+    { name = "Bhuwan Shah", email = "bshah@iastate.edu" }
+]
+license = { text = "AGPL-3.0-or-later" }
+requires-python = ">=3.6"
+dependencies = [
+    "requests",
+    "netCDF4",
+    "geopandas"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/shahbhuwan/GridFlow"
+Repository = "https://github.com/shahbhuwan/GridFlow"
+Issues = "https://github.com/shahbhuwan/GridFlow/issues"
+
+[project.scripts]
+gridflow = "gridflow.__main__:main"
+gridflow-crop = "gridflow.crop_netcdf:main"
+gridflow-clip = "gridflow.clip_netcdf:main"
