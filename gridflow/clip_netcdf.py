@@ -20,11 +20,11 @@ import sys
 import numpy as np
 import netCDF4 as nc
 import geopandas as gpd
-from shapely.geometry import box
 from pathlib import Path
 from datetime import datetime
 
 __version__ = "0.2.3"
+
 
 def setup_logging(log_dir: str, level: str, prefix: str = "") -> None:
     log_dir = Path(log_dir)
@@ -58,6 +58,7 @@ def setup_logging(log_dir: str, level: str, prefix: str = "") -> None:
         force=True
     )
 
+
 def find_coordinate_vars(dataset: nc.Dataset):
     lat_var = lon_var = None
     for var_name, var in dataset.variables.items():
@@ -70,11 +71,13 @@ def find_coordinate_vars(dataset: nc.Dataset):
         logging.error("Could not find suitable 1D latitude or longitude variables.")
     return lat_var, lon_var
 
+
 def reproject_bounds(gdf, target_crs='EPSG:4326'):
     """Reproject shapefile bounds to target CRS (WGS84)."""
     bounds = gdf.to_crs(target_crs).total_bounds
     min_lon, min_lat, max_lon, max_lat = bounds
     return min_lon, min_lat, max_lon, max_lat
+
 
 def clip_netcdf_file(input_path: Path, shapefile_path: Path, buffer_km: float, output_path: Path) -> bool:
     try:
@@ -84,7 +87,8 @@ def clip_netcdf_file(input_path: Path, shapefile_path: Path, buffer_km: float, o
 
         # Log original and reprojected shapefile bounds
         logging.debug(f"Original shapefile CRS: {gdf.crs}")
-        logging.debug(f"Original shapefile bounds: min_lon={gdf.total_bounds[0]}, min_lat={gdf.total_bounds[1]}, max_lon={gdf.total_bounds[2]}, max_lat={gdf.total_bounds[3]}")
+        logging.debug(f"Original shapefile bounds: min_lon={gdf.total_bounds[0]}, min_lat={gdf.total_bounds[1]}, "
+                     f"max_lon={gdf.total_bounds[2]}, max_lat={gdf.total_bounds[3]}")
         logging.debug(f"Reprojected shapefile bounds: min_lon={min_lon}, min_lat={min_lat}, max_lon={max_lon}, max_lat={max_lat}")
 
         # Convert longitudes to 0-360° if necessary
@@ -103,7 +107,8 @@ def clip_netcdf_file(input_path: Path, shapefile_path: Path, buffer_km: float, o
             max_lat += lat_buffer_deg
             min_lon = (min_lon - lon_buffer_deg) % 360
             max_lon = (max_lon + lon_buffer_deg) % 360
-            logging.debug(f"Applied buffer of {buffer_km} km: min_lat={min_lat:.4f}, max_lat={max_lat:.4f}, min_lon={min_lon:.4f}, max_lon={max_lon:.4f}")
+            logging.debug(f"Applied buffer of {buffer_km} km: min_lat={min_lat:.4f}, max_lat={max_lat:.4f}, "
+                         f"min_lon={min_lon:.4f}, max_lon={max_lon:.4f}")
 
         with nc.Dataset(input_path, 'r') as src:
             lat_var, lon_var = find_coordinate_vars(src)
@@ -176,6 +181,7 @@ def clip_netcdf_file(input_path: Path, shapefile_path: Path, buffer_km: float, o
         logging.error(f"Failed to clip {input_path.name}: {e}")
         return False
 
+
 def main():
     parser = argparse.ArgumentParser(
         description="Clip NetCDF files using a shapefile with an optional buffer.",
@@ -217,6 +223,7 @@ def main():
             success_count += 1
 
     logging.info(f"Completed: {success_count}/{len(nc_files)} files clipped successfully")
+
 
 if __name__ == "__main__":
     main()

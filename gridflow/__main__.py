@@ -18,8 +18,9 @@ import logging
 import argparse
 from .downloader import parse_args, run_download
 
+
 def print_intro():
-    intro = """
+    intro = r"""
 ============================================================
   ____ ____  ___ ____  _____ _     _____        __
  / ___|  _ \|_ _|  _ \|  ___| |   / _ \ \      / /
@@ -33,6 +34,7 @@ nodes concurrently.
 ============================================================
 """
     print(intro)
+
 
 def main():
     # Always print intro
@@ -61,6 +63,7 @@ def main():
 
     args = parse_args()
     run_download(args)
+
 
 if __name__ == "__main__":
     main()

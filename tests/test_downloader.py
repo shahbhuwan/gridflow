@@ -1,5 +1,5 @@
-import pytest
 from gridflow.downloader import QueryHandler
+
 
 def test_build_query():
     query_handler = QueryHandler()

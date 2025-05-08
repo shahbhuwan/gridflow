@@ -25,8 +25,9 @@ from typing import Optional, Tuple
 
 __version__ = "0.2.3"
 
+
 def print_intro():
-    intro = """
+    intro = r"""
 ============================================================
   ____ ____  ___ ____  _____ _     _____        __
  / ___|  _ \|_ _|  _ \|  ___| |   / _ \ \      / /
@@ -39,6 +40,7 @@ Effortlessly crop CMIP6 NetCDF files to specific geographic regions.
 ============================================================
 """
     print(intro)
+
 
 def setup_logging(log_dir: str, level: str, prefix: str = "") -> None:
     log_dir = Path(log_dir)
@@ -74,6 +76,7 @@ def setup_logging(log_dir: str, level: str, prefix: str = "") -> None:
         force=True
     )
 
+
 def find_coordinate_vars(dataset: netCDF4.Dataset) -> Tuple[Optional[str], Optional[str]]:
     lat_var = lon_var = None
     for var_name, var in dataset.variables.items():
@@ -93,6 +96,7 @@ def find_coordinate_vars(dataset: netCDF4.Dataset) -> Tuple[Optional[str], Optio
         logging.error("Could not find suitable 1D latitude or longitude variables.")
     return lat_var, lon_var
 
+
 def get_crop_indices(coord_data: np.ndarray, min_val: float, max_val: float, is_longitude: bool = False) -> Tuple[Optional[int], Optional[int]]:
     if is_longitude and min_val > max_val:
         # Handle antimeridian crossing
@@ -103,12 +107,14 @@ def get_crop_indices(coord_data: np.ndarray, min_val: float, max_val: float, is_
         return None, None
     return indices[0], indices[-1]
 
+
 def normalize_longitude(lon: float, target_range: str = '0-360') -> float:
     """Normalize longitude to the target range."""
     lon = lon % 360  # Ensure within 0-360°
     if target_range == '-180-180' and lon > 180:
         lon -= 360
     return lon
+
 
 def crop_netcdf_file(input_path: Path, output_path: Path, min_lat: float, max_lat: float, min_lon: float, max_lon: float, buffer_km: float = 0.0) -> bool:
     try:
@@ -204,6 +210,7 @@ def crop_netcdf_file(input_path: Path, output_path: Path, min_lat: float, max_la
         logging.error(f"Failed to crop {input_path.name}: {e}")
         return False
 
+
 def main():
     print_intro()
 
@@ -259,6 +266,7 @@ def main():
             success_count += 1
 
     logging.info(f"Completed: {success_count}/{len(nc_files)} files cropped successfully")
+
 
 if __name__ == "__main__":
     main()

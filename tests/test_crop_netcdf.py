@@ -1,7 +1,6 @@
-import pytest
 import numpy as np
-from pathlib import Path
 from gridflow.crop_netcdf import find_coordinate_vars, normalize_longitude
+
 
 def test_find_coordinate_vars(tmp_path):
     import netCDF4
@@ -19,6 +18,7 @@ def test_find_coordinate_vars(tmp_path):
         lat_var, lon_var = find_coordinate_vars(ds)
         assert lat_var == "lat"
         assert lon_var == "lon"
+
 
 def test_normalize_longitude():
     assert normalize_longitude(-90, "0-360") == 270
