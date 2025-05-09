@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test:
     name: ${{ matrix.os }} / Python ${{ matrix.python }}
@@ -32,7 +36,7 @@ jobs:
       - name: Run tests
         run: pytest tests --cov=gridflow --cov-report=xml
 
-      - name: Upload coverage to Codecov (Linux only)
+      - name: Upload coverage to Codecov (only on Ubuntu)
         if: runner.os == 'Linux'
         uses: codecov/codecov-action@v3
         with:
