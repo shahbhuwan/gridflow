@@ -1,11 +1,5 @@
 from setuptools import setup, find_packages
-from setuptools.command.install import install
 import os
-
-class CustomInstallCommand(install):
-    def run(self):
-        install.run(self)
-        print("Successfully installed gridflow-0.2.3", flush=True)
 
 readme_path = "README.md"
 long_description = ""
@@ -25,22 +19,37 @@ setup(
     author_email="bshah@iastate.edu",
     url="https://github.com/shahbhuwan/GridFlow",
     license="AGPL-3.0-or-later",
-    packages=find_packages(),
-    install_requires=["requests", "netCDF4", "geopandas"],
-    python_requires=">=3.6",
+    packages=find_packages(exclude=["tests"]),
+    include_package_data=True,
+    install_requires=[
+        "requests>=2.28.0",
+        "netCDF4>=1.6.0",
+        "numpy>=1.21.0",
+        "geopandas>=0.10.0",
+    ],
+    extras_require={
+        "test": [
+            "pytest>=8.3.2",
+            "pytest-cov>=5.0.0",
+        ],
+    },
+    python_requires=">=3.8",
     classifiers=[
         "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
         "Operating System :: OS Independent",
     ],
     entry_points={
         "console_scripts": [
             "gridflow = gridflow.__main__:main",
+            "gridflow-download = gridflow.downloader:run_download",
             "gridflow-crop = gridflow.crop_netcdf:main",
             "gridflow-clip = gridflow.clip_netcdf:main",
             "gridflow-db = gridflow.database_generator:main",
         ],
-    },
-    cmdclass={
-        "install": CustomInstallCommand,
     },
 )

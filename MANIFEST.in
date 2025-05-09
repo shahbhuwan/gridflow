@@ -1,0 +1,10 @@
+include README.md
+include requirements.txt
+include LICENSE.txt
+include pyproject.toml
+recursive-include gridflow *.py
+recursive-include iowa_border *.shp *.dbf *.shx *.prj *.sbn *.sbx *.xml *.CPG
+recursive-include tests *.py
+exclude gridflow/__pycache__/*
+exclude tests/__pycache__/*
+exclude *.pyc
