@@ -14,8 +14,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python: [3.9, 3.10, 3.11]
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Set up Python ${{ matrix.python }}
         uses: actions/setup-python@v4
@@ -30,8 +32,8 @@ jobs:
       - name: Run tests
         run: pytest tests --cov=gridflow --cov-report=xml
 
-      - name: Upload coverage
-        if: runner.os == 'Linux'  # upload once to avoid duplicates
+      - name: Upload coverage to Codecov (Linux only)
+        if: runner.os == 'Linux'
         uses: codecov/codecov-action@v3
         with:
           files: ./coverage.xml
