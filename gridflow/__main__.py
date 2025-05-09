@@ -1,26 +1,13 @@
-# Copyright (c) 2025 Bhuwan Shah
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 import sys
-import logging
 import argparse
-from .downloader import parse_args, run_download
-
+import logging
+from gridflow.downloader import parse_args as download_parse_args, run_download, setup_logging
+from gridflow.crop_netcdf import main as crop_main
+from gridflow.clip_netcdf import main as clip_main
+from gridflow.database_generator import main as db_main
 
 def print_intro():
-    intro = r"""
+    banner = """
 ============================================================
   ____ ____  ___ ____  _____ _     _____        __
  / ___|  _ \|_ _|  _ \|  ___| |   / _ \ \      / /
@@ -33,37 +20,34 @@ Effortlessly download and process CMIP6 climate data from ESGF
 nodes concurrently.
 ============================================================
 """
-    print(intro)
-
+    print(banner)
 
 def main():
-    # Always print intro
     print_intro()
 
-    # Initialize basic logging configuration
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument('--demo', action='store_true', help="Run in demo mode")
-    parser.add_argument('-L', '--log-level', default='minimal', help="Logging level")
+    parser.add_argument('-L', '--log-level', choices=['minimal', 'normal', 'verbose', 'debug'], default='minimal', help="Logging level")
+    parser.add_argument('--log-dir', default='logs', help="Directory for log files")
     parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.2.3')
     args, unknown = parser.parse_known_args()
 
-    # Set up early logging for minimal mode
-    logging.basicConfig(
-        level=logging.CRITICAL,
-        format='%(message)s',
-        handlers=[logging.StreamHandler(sys.stdout)]
-    )
-    logging.addLevelName(logging.CRITICAL, "MINIMAL")
-
-    # Handle demo mode
     if len(sys.argv) == 1 or (len(sys.argv) == 2 and args.demo):
         sys.argv = [sys.argv[0], '--demo']
     elif args.demo and '--demo' not in unknown:
         unknown.append('--demo')
 
-    args = parse_args()
-    run_download(args)
+    setup_logging(args.log_dir, args.log_level)
 
+    if 'gridflow-db' in sys.argv[0]:
+        db_main()
+    elif 'gridflow-crop' in sys.argv[0]:
+        crop_main()
+    elif 'gridflow-clip' in sys.argv[0]:
+        clip_main()
+    else:
+        args = download_parse_args()
+        run_download(args)
 
 if __name__ == "__main__":
     main()

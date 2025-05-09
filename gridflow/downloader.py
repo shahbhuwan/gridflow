@@ -29,7 +29,6 @@ from urllib.parse import urlencode
 from typing import List, Dict, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-
 __version__ = "0.2.3"
 
 ESGF_NODES = [
@@ -56,9 +55,7 @@ def setup_logging(log_dir: str, level: str, prefix: str = "") -> None:
 
     class MinimalFilter(logging.Filter):
         def filter(self, record):
-            if level.lower() == 'minimal':
-                return record.levelno >= logging.CRITICAL
-            return True
+            return record.levelno >= logging.CRITICAL if level.lower() == 'minimal' else True
 
     handlers = [
         logging.FileHandler(log_file),
@@ -67,13 +64,12 @@ def setup_logging(log_dir: str, level: str, prefix: str = "") -> None:
     ]
     handlers[2].addFilter(MinimalFilter())
 
-    # Use a clean format for minimal logging (no prefix), and detailed format for others
     format_str = '%(message)s' if level.lower() == 'minimal' else '%(asctime)s [%(levelname)s] %(message)s'
     logging.basicConfig(
         level=numeric_level,
         format=format_str,
         handlers=handlers,
-        force=True  # Ensure previous handlers are removed
+        force=True
     )
     logging.addLevelName(logging.CRITICAL, "MINIMAL")
 
@@ -346,13 +342,12 @@ def load_config(config_path: str) -> Dict:
         sys.exit(1)
 
 def run_download(args: argparse.Namespace) -> None:
-    # Set up logging early to ensure all messages use the correct format
     if not args.retry_failed:
         activity_id = getattr(args, 'activity', None) or 'unknown'
         resolution = getattr(args, 'resolution', None) or 'unknown'
         if args.demo or args.test:
-            activity_id = 'CMIP'  # Set for DEMO mode based on query results
-            resolution = '100km'  # Set for DEMO mode based on nominal_resolution
+            activity_id = 'CMIP'
+            resolution = '100km'
         resolution = resolution.replace(' ', '') if resolution else 'unknown'
         prefix = f"{activity_id}_{resolution}_"
         setup_logging(args.log_dir, args.log_level, prefix)

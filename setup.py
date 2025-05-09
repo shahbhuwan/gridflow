@@ -7,19 +7,18 @@ class CustomInstallCommand(install):
         install.run(self)
         print("Successfully installed gridflow-0.2.3", flush=True)
 
-# Safely read README.md
 readme_path = "README.md"
 long_description = ""
 if os.path.exists(readme_path):
     with open(readme_path, encoding="utf-8") as f:
         long_description = f.read()
 else:
-    long_description = "A library to download, crop, and clip CMIP6 data from ESGF nodes with deduplication and error handling"
+    long_description = "A library to download, crop, clip, and generate databases for CMIP6 data from ESGF nodes with deduplication and error handling"
 
 setup(
     name="gridflow",
     version="0.2.3",
-    description="A library to download, crop, and clip CMIP6 data from ESGF nodes with deduplication and error handling",
+    description="A library to download, crop, clip, and generate databases for CMIP6 data from ESGF nodes with deduplication and error handling",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Bhuwan Shah",
@@ -38,6 +37,7 @@ setup(
             "gridflow = gridflow.__main__:main",
             "gridflow-crop = gridflow.crop_netcdf:main",
             "gridflow-clip = gridflow.clip_netcdf:main",
+            "gridflow-db = gridflow.database_generator:main",
         ],
     },
     cmdclass={

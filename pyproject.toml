@@ -1,7 +1,7 @@
 [project]
 name = "gridflow"
 version = "0.2.3"
-description = "A library to download, crop, and clip CMIP6 data from ESGF nodes with deduplication and error handling"
+description = "A library to download, crop, clip, and generate databases for CMIP6 data from ESGF nodes with deduplication and error handling"
 readme = "README.md"
 authors = [
     { name = "Bhuwan Shah", email = "bshah@iastate.edu" }
@@ -27,6 +27,7 @@ Issues = "https://github.com/shahbhuwan/GridFlow/issues"
 gridflow = "gridflow.__main__:main"
 gridflow-crop = "gridflow.crop_netcdf:main"
 gridflow-clip = "gridflow.clip_netcdf:main"
+gridflow-db = "gridflow.database_generator:main"
 
 [project.optional-dependencies]
 test = [

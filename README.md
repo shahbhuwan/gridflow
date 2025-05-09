@@ -1,34 +1,27 @@
 GridFlow
- A Python Stuart-friendly library to download, crop, and clip CMIP6 data from ESGF nodes with deduplication and error handling.
+A Python library to download, crop, clip, and generate databases for CMIP6 data from ESGF nodes with deduplication and error handling.
+Installation
+pip install gridflow
 
- ## Installation
- ```bash
- pip install gridflow
- ```
+Usage
+Download CMIP6 Data
+gridflow --demo
 
- ## Usage
+Crop NetCDF Files
+gridflow-crop --input-dir ./cmip6_data --output-dir ./cmip6_data_cropped --min-lat 35 --max-lat 70 --min-lon -10 --max-lon 40
 
- ### Download CMIP6 Data
- ```bash
- gridflow --demo
- ```
+Clip NetCDF Files with Shapefile
+gridflow-clip --input-dir ./cmip6_data --output-dir ./cmip6_data_clipped --shapefile path/to/region.shp --buffer-km 10
 
- ### Crop NetCDF Files
- ```bash
- gridflow-crop --input-dir ./cmip6_data --output-dir ./cmip6_data_cropped --min-lat 35 --max-lat 70 --min-lon -10 --max-lon 40
- ```
+Generate Database of NetCDF Files
+gridflow-db --input-dir ./cmip6_data --output-file database.json
 
- ### Clip NetCDF Files with Shapefile
- ```bash
- gridflow-clip --input-dir ./cmip6_data --output-dir ./cmip6_data_clipped --shapefile path/to/region.shp --buffer-km 10
- ```
+Requirements
 
- ## Requirements
- - Python >= 3.6
- - requests
- - netCDF4
- - geopandas
+Python >= 3.6
+requests
+netCDF4
+geopandas
 
- ## License
- AGPL-3.0-or-later
-
+License
+AGPL-3.0-or-later
