@@ -1,4 +1,4 @@
-name: Run Tests (Cross-Platform Matrix)
+name: Run Tests (Windows, Python 3.11 only)
 
 on:
   push:
@@ -6,27 +6,18 @@ on:
   pull_request:
     branches: [ main ]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   test:
-    name: ${{ matrix.os }} / Python ${{ matrix.python }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python: [3.9, 3.10, 3.11]
+    runs-on: windows-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Python ${{ matrix.python }}
+      - name: Set up Python 3.11
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python }}
+          python-version: 3.11
 
       - name: Install dependencies
         run: |
@@ -36,8 +27,7 @@ jobs:
       - name: Run tests
         run: pytest tests --cov=gridflow --cov-report=xml
 
-      - name: Upload coverage to Codecov (only on Ubuntu)
-        if: runner.os == 'Linux'
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           files: ./coverage.xml
