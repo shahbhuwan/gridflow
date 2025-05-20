@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gridflow"
-version = "0.2.3"
-description = "A library to download, crop, clip, and generate databases for CMIP6 data from ESGF nodes with deduplication and error handling"
+version = "1.0"
+description = "A library to download, crop, clip, generate databases, and run batch processes for CMIP5, CMIP6, and PRISM climate data with deduplication and error handling"
 readme = "README.md"
 authors = [{name = "Bhuwan Shah", email = "bshah@iastate.edu"}]
 license = {file = "LICENSE.txt"}
@@ -32,7 +32,9 @@ Repository = "https://github.com/shahbhuwan/GridFlow"
 
 [project.scripts]
 gridflow = "gridflow.__main__:main"
-gridflow-download = "gridflow.downloader:run_download"
+gridflow-download = "gridflow.downloader.cmip6_downloader:run_download"
+gridflow-download-cmip5 = "gridflow.downloader.cmip5_downloader:run_download"
+gridflow-download-prism = "gridflow.downloader.prism_downloader:download_prism"
 gridflow-crop = "gridflow.crop_netcdf:main"
 gridflow-clip = "gridflow.clip_netcdf:main"
 gridflow-db = "gridflow.database_generator:main"

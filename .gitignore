@@ -1,30 +1,52 @@
-# Virtual environments
-venv/
-gridflow-env/
-
-# Compiled Python files
+# Python
 __pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+*.egg
+*.whl
+*.tar.gz
+*.zip
 *.pyc
 
-# Logs and data directories
-logs/
-*.log
-cmip6_data/
-cmip6_data_cropped/
-cmip6_data_clipped/
-metadata/
-*.tmp
-
-# Build artifacts
-dist/
-build/
-*.egg-info/
-
-# Testing and coverage artifacts
-.pytest_cache/
+# Testing
 htmlcov/
 .coverage
 coverage.xml
 
-# Miscellaneous
-.gitignore
+# Logs and data
+logs/
+cmip6_data/
+prism_data/
+output/
+metadata/
+gridflow_tracking.db
+gridflow_config.json
+
+# Virtual environments
+gridflow-env/
+gridflow-test/
+venv/
+env/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini"__pycache__/" 
+".pytest_cache/" 
+"dist/" 
+"build/" 

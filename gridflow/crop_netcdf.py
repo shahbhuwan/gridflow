@@ -13,42 +13,27 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import argparse
 import logging
-import sys
 import math
-import netCDF4
+import netCDF4 as nc
 import numpy as np
 from pathlib import Path
 from typing import Optional, Tuple
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
-from .downloader import setup_logging
-
-__version__ = "0.2.3"
-
-def print_intro():
-    intro = r"""
-============================================================
-  ____ ____  ___ ____  _____ _     _____        __
- / ___|  _ \|_ _|  _ \|  ___| |   / _ \ \      / /
-| |  _| |_) || || | | | |_  | |  | | | \ \ /\ / /
-| |_| |  _ < | || |_| |  _| | |__| |_| |\ V  V /
- \____|_| \_\___|____/|_|   |_____\___/  \_/\_/
-============================================================
-Welcome to GridFlow v0.2.3! Copyright (c) 2025 Bhuwan Shah
-Effortlessly crop CMIP6 NetCDF files to specific geographic regions.
-============================================================
-"""
-    print(intro)
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
 
 logging_lock = Lock()
 
-def find_coordinate_vars(dataset: netCDF4.Dataset) -> tuple[str | None, str | None]:
+def find_coordinate_vars(dataset: nc.Dataset) -> Tuple[Optional[str], Optional[str]]:
+    """Find latitude and longitude variables in the NetCDF dataset."""
     lat_var = None
     lon_var = None
+    debug_info = ["Available variables and attributes:"]
     for var_name in dataset.variables:
         var = dataset.variables[var_name]
+        attrs = {k: str(var.getncattr(k)) for k in var.ncattrs()} if var.ncattrs() else {}
+        debug_info.append(f"  {var_name}: shape={var.shape}, attrs={attrs}")
         if len(var.shape) != 1:
             continue
         if hasattr(var, 'standard_name'):
@@ -56,11 +41,20 @@ def find_coordinate_vars(dataset: netCDF4.Dataset) -> tuple[str | None, str | No
                 lat_var = var_name
             elif var.standard_name == 'longitude':
                 lon_var = var_name
+        elif var_name.lower() in ['lat', 'latitude', 'y', 'nav_lat']:
+            lat_var = var_name
+        elif var_name.lower() in ['lon', 'longitude', 'x', 'nav_lon']:
+            lon_var = var_name
     if not lat_var or not lon_var:
+        with logging_lock:
+            logging.error(f"No latitude or longitude variables found in dataset\n" + "\n".join(debug_info))
         return None, None
+    with logging_lock:
+        logging.debug(f"Found lat_var={lat_var}, lon_var={lon_var}")
     return lat_var, lon_var
 
 def get_crop_indices(coord_data: np.ndarray, min_val: float, max_val: float, is_longitude: bool = False) -> Tuple[Optional[int], Optional[int]]:
+    """Find indices for cropping coordinate data within given bounds."""
     if is_longitude and min_val > max_val:
         indices = np.where((coord_data >= min_val) | (coord_data <= max_val))[0]
     else:
@@ -69,15 +63,40 @@ def get_crop_indices(coord_data: np.ndarray, min_val: float, max_val: float, is_
         return None, None
     return indices[0], indices[-1]
 
-def normalize_longitude(lon: float, target_range: str = '0-360') -> float:
-    lon = lon % 360
-    if target_range == '-180-180' and lon > 180:
-        lon -= 360
+def normalize_lon(lon: float, dataset_min: float, dataset_max: float) -> float:
+    """Normalize input longitude to match dataset's format (0–360 or -180–180)."""
+    if dataset_min >= 0 and dataset_max <= 360:
+        if lon < 0:
+            return lon + 360
+    elif dataset_min >= -180 and dataset_max <= 180:
+        if lon > 180:
+            return lon - 360
     return lon
 
-def crop_netcdf_file(input_path: Path, output_path: Path, min_lat: float, max_lat: float, min_lon: float, max_lon: float, buffer_km: float = 0.0) -> bool:
+def crop_netcdf_file(input_path: Path, output_path: Path, min_lat: float, max_lat: float, min_lon: float, max_lon: float, buffer_km: float = 0.0, stop_flag: callable = None) -> bool:
+    """
+    Crop a single NetCDF file by spatial bounds (latitude and longitude).
+
+    Args:
+        input_path: Path to input NetCDF file.
+        output_path: Path to output NetCDF file.
+        min_lat: Minimum latitude bound.
+        max_lat: Maximum latitude bound.
+        min_lon: Minimum longitude bound.
+        max_lon: Maximum longitude bound.
+        buffer_km: Buffer distance in kilometers to expand bounds.
+        stop_flag: Function to check if operation should stop.
+
+    Returns:
+        bool: True if successful, False otherwise.
+    """
     try:
-        with netCDF4.Dataset(input_path, 'r') as src:
+        if stop_flag and stop_flag():
+            with logging_lock:
+                logging.info(f"Cropping stopped for {input_path.name}")
+            return False
+
+        with nc.Dataset(input_path, 'r') as src:
             lat_var, lon_var = find_coordinate_vars(src)
             if not lat_var or not lon_var:
                 with logging_lock:
@@ -91,48 +110,45 @@ def crop_netcdf_file(input_path: Path, output_path: Path, min_lat: float, max_la
                     logging.error(f"Latitude or longitude is not 1D in {input_path.name}")
                 return False
 
+            # Determine longitude range
             lon_min, lon_max = lon_data.min(), lon_data.max()
             target_range = '0-360' if lon_min >= 0 and lon_max <= 360 else '-180-180'
             with logging_lock:
                 logging.debug(f"NetCDF longitude range: {lon_min} to {lon_max}, using {target_range}")
 
+            # Normalize input longitudes to match dataset range
+            min_lon = normalize_lon(min_lon, lon_min, lon_max)
+            max_lon = normalize_lon(max_lon, lon_min, lon_max)
+            with logging_lock:
+                logging.debug(f"Normalized input lon to match dataset: min_lon={min_lon}, max_lon={max_lon}")
+
+            # Validate normalized bounds
             if target_range == '0-360' and (min_lon < 0 or max_lon > 360):
                 with logging_lock:
-                    logging.error(
-                        f"Invalid longitude bounds for 0-360: min_lon={min_lon}, max_lon={max_lon}"
-                    )
+                    logging.error(f"Invalid longitude bounds for 0-360 after normalization: min_lon={min_lon}, max_lon={max_lon}")
                 return False
             if target_range == '-180-180' and (min_lon < -180 or max_lon > 180):
                 with logging_lock:
-                    logging.error(
-                        f"Invalid longitude bounds for -180-180: min_lon={min_lon}, max_lon={max_lon}"
-                    )
+                    logging.error(f"Invalid longitude bounds for -180-180 after normalization: min_lon={min_lon}, max_lon={max_lon}")
                 return False
-
-            min_lon = normalize_longitude(min_lon, target_range)
-            max_lon = normalize_longitude(max_lon, target_range)
-            with logging_lock:
-                logging.debug(f"Input longitudes normalized: min_lon={min_lon}, max_lon={max_lon}")
-
-            if buffer_km > 0:
-                lat_buffer_deg = buffer_km / 111.0
-                avg_lat = (min_lat + max_lat) / 2.0
-                lon_buffer_deg = buffer_km / (111.0 * math.cos(math.radians(avg_lat)))
-                min_lat -= lat_buffer_deg
-                max_lat += lat_buffer_deg
-                min_lon = normalize_longitude(min_lon - lon_buffer_deg, target_range)
-                max_lon = normalize_longitude(max_lon + lon_buffer_deg, target_range)
-                with logging_lock:
-                    logging.debug(
-                        f"Adjusted bounds with buffer: min_lat={min_lat}, max_lat={max_lat}, "
-                        f"min_lon={min_lon}, max_lon={max_lon}"
-                    )
-
             if min_lat < -90 or max_lat > 90:
                 with logging_lock:
                     logging.error(f"Latitude bounds out of range: min_lat={min_lat}, max_lat={max_lat}")
                 return False
 
+            # Apply buffer
+            if buffer_km > 0:
+                lat_buffer_deg = buffer_km / 111.0  # Approx. 111 km per degree of latitude
+                avg_lat = (min_lat + max_lat) / 2.0
+                lon_buffer_deg = buffer_km / (111.0 * math.cos(math.radians(avg_lat)))  # Adjust for longitude
+                min_lat = max(-90, min_lat - lat_buffer_deg)
+                max_lat = min(90, max_lat + lat_buffer_deg)
+                min_lon = normalize_lon(min_lon - lon_buffer_deg, lon_min, lon_max)
+                max_lon = normalize_lon(max_lon + lon_buffer_deg, lon_min, lon_max)
+                with logging_lock:
+                    logging.debug(f"Adjusted bounds with buffer: min_lat={min_lat}, max_lat={max_lat}, min_lon={min_lon}, max_lon={max_lon}")
+
+            # Get cropping indices
             lat_indices = get_crop_indices(lat_data, min_lat, max_lat)
             lon_indices = get_crop_indices(lon_data, min_lon, max_lon, is_longitude=True)
             if lat_indices[0] is None or lon_indices[0] is None:
@@ -145,19 +161,23 @@ def crop_netcdf_file(input_path: Path, output_path: Path, min_lat: float, max_la
             lat_size = lat_end - lat_start + 1
             lon_size = lon_end - lon_start + 1
 
+            # Identify dimension names
             lat_dim = src.variables[lat_var].dimensions[0]
             lon_dim = src.variables[lon_var].dimensions[0]
 
-            with netCDF4.Dataset(output_path, 'w', format=src.file_format) as dst:
+            # Create output NetCDF file
+            with nc.Dataset(output_path, 'w', format=src.file_format) as dst:
                 dst.setncatts(src.__dict__)
+                # Copy dimensions, adjusting for cropped lat/lon
                 for dim in src.dimensions:
                     size = src.dimensions[dim].size
                     if dim == lat_dim:
                         size = lat_size
                     elif dim == lon_dim:
                         size = lon_size
-                    dst.createDimension(dim, size)
+                    dst.createDimension(dim, size if not src.dimensions[dim].isunlimited() else None)
 
+                # Copy variables
                 for var_name, var in src.variables.items():
                     dims = var.dimensions
                     slices = []
@@ -174,115 +194,118 @@ def crop_netcdf_file(input_path: Path, output_path: Path, min_lat: float, max_la
                     var_out.setncatts({k: v for k, v in var.__dict__.items() if k != '_FillValue'})
                     data = var[tuple(slices)]
                     with logging_lock:
-                        logging.debug(
-                            f"Copying {var_name}: data shape {data.shape}, var_out shape {var_out.shape}"
-                        )
+                        logging.debug(f"Copying {var_name}: data shape {data.shape}, var_out shape {var_out.shape} in {input_path.name}")
                     var_out[:] = data
 
         with logging_lock:
-            logging.info(f"Cropped {input_path.name} to {output_path.name}")
+            logging.info(f"Cropped {input_path.name} → {output_path.name}")
+            logging.info(f"Cropped file created: {output_path}")
         return True
+
     except Exception as e:
         with logging_lock:
             logging.error(f"Failed to crop {input_path.name}: {e}")
         return False
 
-def process_file(nc_file: Path, output_dir: Path, min_lat: float, max_lat: float, min_lon: float, max_lon: float, buffer_km: float) -> bool:
-    output_file = output_dir / nc_file.name.replace('.nc', '_cropped.nc')
-    return crop_netcdf_file(nc_file, output_file, min_lat, max_lat, min_lon, max_lon, buffer_km)
+def crop_netcdf(input_dir: str, output_dir: str, min_lat: float, max_lat: float, min_lon: float, max_lon: float, buffer_km: float = 0.0, stop_flag: callable = None, workers: int = None, demo: bool = False) -> bool:
+    """
+    Crop all NetCDF files in a directory by spatial bounds in parallel.
 
-def main():
-    print_intro()
-    parser = argparse.ArgumentParser(
-        description="Crop NetCDF files to a specified geographic region with optional buffer.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument('-i', '--input-dir', default='./cmip6_data', help="Directory containing input NetCDF files")
-    parser.add_argument('-o', '--output-dir', default='./cmip6_data_cropped', help="Directory for cropped NetCDF files")
-    parser.add_argument('--min-lat', type=float, help="Minimum latitude (-90 to 90)")
-    parser.add_argument('--max-lat', type=float, help="Maximum latitude (-90 to 90)")
-    parser.add_argument('--min-lon', type=float, help="Minimum longitude (-180 to 360)")
-    parser.add_argument('--max-lon', type=float, help="Maximum longitude (-180 to 360)")
-    parser.add_argument('--buffer-km', type=float, default=0.0, help="Buffer distance in kilometers")
-    parser.add_argument('--log-dir', default='./logs', help="Directory for log files")
-    parser.add_argument('-L', '--log-level', choices=['minimal', 'normal', 'verbose', 'debug'], default='minimal', help="Logging level")
-    parser.add_argument('-w', '--workers', type=int, default=4, help="Number of parallel workers")
-    parser.add_argument('--demo', action='store_true', help="Run in demo mode with default settings")
-    parser.add_argument('-v', '--version', action='version', version=f'%(prog)s {__version__}')
-    args = parser.parse_args()
+    Args:
+        input_dir: Path to directory containing input NetCDF files.
+        output_dir: Path to directory to save cropped NetCDF files.
+        min_lat: Minimum latitude bound.
+        max_lat: Maximum latitude bound.
+        min_lon: Minimum longitude bound.
+        max_lon: Maximum longitude bound.
+        buffer_km: Buffer distance in kilometers to expand bounds.
+        stop_flag: Function to check if operation should stop.
+        workers: Number of parallel workers (defaults to number of CPU cores).
+        demo: If True, use demo bounds (35N-45N, 95W-105W).
 
-    setup_logging(args.log_dir, args.log_level, prefix="crop_")
+    Returns:
+        bool: True if any files were successfully processed, False otherwise.
+    """
+    try:
+        input_dir = Path(input_dir)
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.demo:
-        if args.input_dir == './cmip6_data':  # Only set default if not provided
-            args.input_dir = "./demo_cmip6_data"
-        if args.output_dir == './cmip6_data_cropped':  # Only set default if not provided
-            args.output_dir = "./demo_cmip6_data_cropped"
-        args.min_lat = args.min_lat if args.min_lat is not None else 35.0
-        args.max_lat = args.max_lat if args.max_lat is not None else 70.0
-        args.min_lon = args.min_lon if args.min_lon is not None else -10.0
-        args.max_lon = args.max_lon if args.max_lon is not None else 40.0
-        args.workers = 2
-        args.buffer_km = 10.0
-        logging.critical("Cropping CMIP6 NetCDF files in demo mode")
+        # Use demo bounds if specified
+        if demo:
+            input_dir = Path("./cmip6_data")  # Default to CMIP6 demo output
+            output_dir = Path("./cmip6_cropped_data") # Default output for cropped files
+            min_lat, max_lat = 35.0, 45.0  # 10-degree box centered around 40N
+            min_lon, max_lon = -105.0, -95.0  # Centered around 100W
+            buffer_km = 50.0  # 50 km buffer
+            with logging_lock:
+                logging.info(f"Demo mode: Using bounds min_lat={min_lat}, max_lat={max_lat}, min_lon={min_lon}, max_lon={max_lon}, buffer_km={buffer_km}")
 
-    if args.min_lat is None or args.max_lat is None or args.min_lon is None or args.max_lon is None:
-        logging.error("Must specify --min-lat, --max-lat, --min-lon, and --max-lon unless in demo mode")
-        sys.exit(1)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Validate bounds
+        if min_lat >= max_lat or min_lon >= max_lon:
+            with logging_lock:
+                logging.error(f"Invalid bounds: min_lat={min_lat}, max_lat={max_lat}, min_lon={min_lon}, max_lon={max_lon}")
+            return False
+        if buffer_km < 0:
+            with logging_lock:
+                logging.error(f"Buffer cannot be negative: buffer_km={buffer_km}")
+            return False
 
-    if args.min_lat >= args.max_lat:
+        # Find all NetCDF files
+        nc_files = list(input_dir.glob("*.nc"))
+        if not nc_files:
+            with logging_lock:
+                logging.critical(f"No NetCDF files found in {input_dir}. Run 'gridflow download --demo' to generate sample files.")
+            return False
+
+        total_files = len(nc_files)
         with logging_lock:
-            logging.error("min-lat must be less than max-lat")
-        sys.exit(1)
-    if args.min_lon >= args.max_lon:
-        with logging_lock:
-            logging.error("min-lon must be less than max-lon")
-        sys.exit(1)
-    if not (-90 <= args.min_lat <= 90 and -90 <= args.max_lat <= 90):
-        with logging_lock:
-            logging.error("Latitude must be between -90 and 90")
-        sys.exit(1)
-    if not (-180 <= args.min_lon <= 360 and -180 <= args.max_lon <= 360):
-        with logging_lock:
-            logging.error("Longitude must be between -180 and 360")
-        sys.exit(1)
+            logging.info(f"Found {total_files} NetCDF files to crop")
 
-    input_dir = Path(args.input_dir)
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+        # Prepare tasks
+        tasks = []
+        for nc_file in nc_files:
+            output_file = output_dir / f"{nc_file.stem}_cropped{nc_file.suffix}"
+            tasks.append((nc_file, output_file))
 
-    if not input_dir.exists():
-        with logging_lock:
-            logging.error(f"Input directory {input_dir} does not exist")
-        sys.exit(1)
+        # Process files in parallel
+        workers = workers or os.cpu_count() or 4
+        completed = 0
+        success_count = 0
+        progress_interval = max(1, total_files // 10)
+        next_threshold = progress_interval
 
-    nc_files = list(input_dir.glob("*.nc"))
-    if not nc_files:
-        with logging_lock:
-            logging.error(f"No NetCDF files found in {input_dir}")
-        sys.exit(1)
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            future_to_task = {
+                executor.submit(crop_netcdf_file, in_file, out_file, min_lat, max_lat, min_lon, max_lon, buffer_km, stop_flag): (in_file, out_file)
+                for in_file, out_file in tasks
+            }
+            for future in as_completed(future_to_task):
+                if stop_flag and stop_flag():
+                    with logging_lock:
+                        logging.info("Cropping operation stopped by user")
+                    executor.shutdown(wait=False)  # Gracefully shut down executor
+                    break
 
-    with logging_lock:
-        logging.info(f"Found {len(nc_files)} NetCDF files to process")
-
-    success_count = 0
-    success_lock = Lock()
-    with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        futures = [
-            executor.submit(
-                process_file, nc_file, output_dir, args.min_lat, args.max_lat, args.min_lon,
-                args.max_lon, args.buffer_km
-            )
-            for nc_file in nc_files
-        ]
-        for future in as_completed(futures):
-            if future.result():
-                with success_lock:
+                in_file, out_file = future_to_task[future]
+                result = future.result()
+                completed += 1
+                if result:
                     success_count += 1
 
-    with logging_lock:
-        logging.critical(f"Completed: {success_count}/{len(nc_files)} files cropped successfully")
-        logging.info(f"Completed: {success_count}/{len(nc_files)} files cropped successfully")
+                with logging_lock:
+                    if completed >= next_threshold:
+                        logging.info(f"Progress: {completed}/{total_files} files (Successful: {success_count})")
+                        next_threshold += progress_interval
 
-if __name__ == "__main__":
-    main()
+        with logging_lock:
+            logging.info(f"Final Progress: {completed}/{total_files} files (Successful: {success_count})")
+            logging.info(f"Completed: {success_count}/{total_files} files")
+        return success_count > 0
+
+    except Exception as e:
+        with logging_lock:
+            logging.error(f"Failed to crop directory {input_dir}: {e}")
+        return False
