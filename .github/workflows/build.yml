@@ -13,10 +13,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [ windows-latest, macos-latest, ubuntu-latest ]
         python-version: [ "3.10" ]
 
     steps:
+    # ────────────────────────────────────────────────────────────────
     - name: Checkout code
       uses: actions/checkout@v4
 
@@ -24,65 +25,68 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-
+    # ────────────────────────────────────────────────────────────────
+    # Debug: list repository contents
     - name: Debug – list files
       run: |
-        echo "Current directory: $PWD"
+        echo "Repo root: $PWD"
         ls -R
-
+    # ────────────────────────────────────────────────────────────────
+    # Linux-only system libraries required by some scientific deps
     - name: Install system dependencies (Ubuntu only)
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
         sudo apt-get install -y libgeos-dev libproj-dev libnetcdf-dev
-
-    - name: Upgrade pip and install Python dependencies
+    # ────────────────────────────────────────────────────────────────
+    - name: Upgrade pip & install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller
-        pip install -r requirements.txt || true
+        pip install pyinstaller                 # explicit, just in case
+        pip install -r requirements.txt || true # don't crash on wheels
         pip list
-
+    # ────────────────────────────────────────────────────────────────
+    # Build SINGLE-FILE executables  ⬇⬇⬇
     - name: Build CLI executable
       run: |
-        pyinstaller gridflow-cli.spec
+        pyinstaller --onefile gridflow-cli.spec
       env:
         PYTHONPATH: .
 
     - name: Build GUI executable
       run: |
-        pyinstaller GridFlowGUI.spec
+        pyinstaller --onefile GridFlowGUI.spec
       env:
         PYTHONPATH: .
-
+    # ────────────────────────────────────────────────────────────────
+    # Rename outputs (one-file mode → files drop directly into dist/)
     - name: Rename executables for each OS
       shell: bash
       run: |
-        echo "Renaming executables for ${{ matrix.os }}"
         case "${{ matrix.os }}" in
           windows-latest)
-            mv dist/gridflow-cli/gridflow-cli.exe dist/gridflow-cli-windows.exe
-            mv dist/GridFlowGUI/GridFlowGUI.exe dist/gridflow-gui-windows.exe
+            mv dist/gridflow-cli.exe  dist/gridflow-cli-windows.exe
+            mv dist/GridFlowGUI.exe   dist/gridflow-gui-windows.exe
             ;;
           macos-latest)
-            mv dist/gridflow-cli/gridflow-cli dist/gridflow-cli-macos
-            mv dist/GridFlowGUI/GridFlowGUI dist/gridflow-gui-macos
+            mv dist/gridflow-cli      dist/gridflow-cli-macos
+            mv dist/GridFlowGUI       dist/gridflow-gui-macos
             ;;
           ubuntu-latest)
-            mv dist/gridflow-cli/gridflow-cli dist/gridflow-cli-linux
-            mv dist/GridFlowGUI/GridFlowGUI dist/gridflow-gui-linux
+            mv dist/gridflow-cli      dist/gridflow-cli-linux
+            mv dist/GridFlowGUI       dist/gridflow-gui-linux
             ;;
         esac
-
-    - name: Upload artifacts
+    # ────────────────────────────────────────────────────────────────
+    - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
         name: gridflow-executables-${{ matrix.os }}
         path: |
           dist/gridflow-cli-*
           dist/gridflow-gui-*
-
-    - name: Upload to GitHub Release
+    # ────────────────────────────────────────────────────────────────
+    - name: Attach binaries to GitHub Release (on publish)
       if: github.event_name == 'release' && github.event.action == 'published'
       uses: softprops/action-gh-release@v2
       with:
