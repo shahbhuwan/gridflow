@@ -7,7 +7,7 @@ if os.path.exists(readme_path):
     with open(readme_path, encoding="utf-8") as f:
         long_description = f.read()
 else:
-    long_description = "A library and GUI to download, crop, clip, and catalog CMIP5, CMIP6, and PRISM climate data concurrently"
+    long_description = "A library and GUI to download, crop, clip, and catalog CMIP5, CMIP6, and PRISM climate data with deduplication, error handling, and retry capabilities"
 
 setup(
     name="gridflow",
@@ -46,6 +46,7 @@ setup(
         "PyQt5>=5.15.9,<6.0",
         "python-dateutil>=2.8.0,<3.0",
         "shapely>=1.7.1,<2.0",
+        "pyproj>=2.6.1.post1,<4.0",
     ],
     extras_require={
         "test": [

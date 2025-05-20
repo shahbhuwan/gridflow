@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "gridflow"
 version = "1.0"
-description = "A library and GUI to download, crop, clip, and catalog CMIP5, CMIP6, and PRISM climate data concurrently"
+description = "A library and GUI to download, crop, clip, and catalog CMIP5, CMIP6, and PRISM climate data with deduplication and error handling"
 readme = "README.md"
 authors = [{name = "Bhuwan Shah", email = "bshah@iastate.edu"}]
 license = {file = "LICENSE.txt"}
@@ -18,6 +18,7 @@ dependencies = [
     "PyQt5>=5.15.9,<6.0",
     "python-dateutil>=2.8.0,<3.0",
     "shapely>=1.7.1,<2.0",
+    "pyproj>=2.6.1.post1,<4.0",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
