@@ -66,8 +66,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "gridflow = gridflow.__main__:main",
-            "gridflow-gui = gui.main:main",
+            "gridflow = gridflow_entry:main",
         ],
     },
 )

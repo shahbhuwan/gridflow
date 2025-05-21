@@ -35,8 +35,7 @@ Homepage = "https://github.com/shahbhuwan/GridFlow"
 Repository = "https://github.com/shahbhuwan/GridFlow"
 
 [project.scripts]
-gridflow = "gridflow.__main__:main"
-gridflow-gui = "gui.main:main"
+gridflow = "gridflow_entry:main"
 
 [project.optional-dependencies]
 test = [
