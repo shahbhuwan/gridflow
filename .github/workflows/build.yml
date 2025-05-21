@@ -34,7 +34,7 @@ jobs:
     - name: Install system dependencies (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        brew install gdal libnetcdf
+        brew install gdal netcdf
 
     - name: Install dependencies
       run: |
